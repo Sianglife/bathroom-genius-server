@@ -1,13 +1,10 @@
 # Bathroom Genius - Backend Server
 
-> Intelligent public restroom discovery, recommendation, rating, and community review backend service.
+Intelligent public restroom discovery, recommendation, rating, and community review backend service.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![NestJS](https://img.shields.io/badge/Framework-NestJS%2011-ea2845?logo=nestjs)](https://nestjs.com/)
 [![Node.js](https://img.shields.io/badge/Node.js-v20%2B-339933?logo=node.js)](https://nodejs.org/)
-[![Package Manager](https://img.shields.io/badge/pnpm-Only-f69220?logo=pnpm)](https://pnpm.io/)
-[![MongoDB](https://img.shields.io/badge/Database-MongoDB%20(2dsphere)-47A248?logo=mongodb)](https://www.mongodb.com/)
-[![LINE Bot](https://img.shields.io/badge/LINE-Messaging%20API-00C300?logo=line)](https://developers.line.biz/)
 
 ---
 
@@ -195,7 +192,7 @@ bathroom-genius-server/
 
 ### Module Overview
 
-#### 1. LINEBOT (`src/modules/linebot/`)
+#### 1. LineBOT (`src/modules/linebot/`)
 - **Webhook Endpoint**: `POST /api/linebot/webhook`
 - **Security**: `LineSignatureGuard` extracts the `x-line-signature` header and `req.rawBody`, executing HMAC-SHA256 signature verification via `@line/bot-sdk`.
 - **Event Dispatcher (`LinebotService`)**:
