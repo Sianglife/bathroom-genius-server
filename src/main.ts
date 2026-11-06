@@ -3,11 +3,13 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { AuthConfig } from './modules/auth/auth.config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
 
-  app.enableCors();
+  const authConfig = app.get(AuthConfig);
+  app.enableCors({ origin: authConfig.origin, credentials: true });
   app.setGlobalPrefix('api');
 
   // 配置全域 ValidationPipe 驗證機制
@@ -27,17 +29,16 @@ async function bootstrap() {
     .setTitle('廁所達人 (bathroom-genius) API')
     .setDescription('MVP 階段廁所搜尋、推薦、評分與評論後端服務 API 文件')
     .setVersion('1.0')
-    .addBearerAuth(
+    .addCookieAuth(
+      authConfig.cookieName,
       {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        name: 'Authorization',
-        in: 'header',
-        description: '預留 Token 認證：請輸入 JWT Token',
+        type: 'apiKey',
+        in: 'cookie',
+        description: '登入 session；寫入另須 Origin 與 X-CSRF-Token',
       },
-      'bearer',
+      'session',
     )
+    .addTag('Auth', 'LINE 登入、session 與 CSRF')
     .addTag('Health', '系統健康檢查')
     .addTag('Toilets', '廁所資料管理與附近推薦')
     .addTag('Reviews', '廁所評論與評分管理')

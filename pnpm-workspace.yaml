@@ -5,4 +5,6 @@ packages:
 allowBuilds:
   '@parcel/watcher': true
   '@scarf/scarf': false
+  esbuild: false
+  mongodb-memory-server: true
   unrs-resolver: false

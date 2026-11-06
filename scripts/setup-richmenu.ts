@@ -60,7 +60,7 @@ async function main() {
     channelAccessToken,
   });
 
-  const imagePath = path.resolve(__dirname, '../assets/richmenu/richmenu.png');
+  const imagePath = path.resolve(__dirname, '../richmenu/richmenu.png');
 
   switch (command) {
     case 'create': {

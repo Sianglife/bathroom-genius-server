@@ -5,6 +5,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { HttpExceptionFilter } from './../src/common/filters/http-exception.filter';
+import { AuthConfig } from '../src/modules/auth/auth.config';
 
 describe('Bathroom Genius API (e2e)', () => {
   let app: INestApplication<App>;
@@ -31,17 +32,7 @@ describe('Bathroom Genius API (e2e)', () => {
       .setTitle('廁所達人 (bathroom-genius) API')
       .setDescription('MVP 階段廁所搜尋、推薦、評分與評論後端服務 API 文件')
       .setVersion('1.0')
-      .addBearerAuth(
-        {
-          type: 'http',
-          scheme: 'bearer',
-          bearerFormat: 'JWT',
-          name: 'Authorization',
-          in: 'header',
-          description: '預留 Token 認證：請輸入 JWT Token',
-        },
-        'bearer',
-      )
+      .addCookieAuth(app.get(AuthConfig).cookieName, { type: 'apiKey', in: 'cookie' }, 'session')
       .addTag('Health', '系統健康檢查')
       .addTag('Toilets', '廁所資料管理與附近推薦')
       .addTag('Reviews', '廁所評論與評分管理')
@@ -79,7 +70,7 @@ describe('Bathroom Genius API (e2e)', () => {
       expect(response.headers['content-type']).toContain('text/html');
     });
 
-    it('GET /docs-json should return valid OpenAPI specification with all MVP endpoints and Bearer Auth', async () => {
+    it('GET /docs-json should return valid OpenAPI specification with session cookie authentication', async () => {
       const response = await request(app.getHttpServer())
         .get('/docs-json')
         .expect(200);
@@ -89,12 +80,12 @@ describe('Bathroom Genius API (e2e)', () => {
       expect(spec.info.title).toBe('廁所達人 (bathroom-genius) API');
       expect(spec.info.version).toBe('1.0');
 
-      // 驗證 Bearer Auth 安全性定義
-      expect(spec.components?.securitySchemes).toHaveProperty('bearer');
-      expect(spec.components.securitySchemes.bearer).toMatchObject({
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
+      // 驗證 session Cookie 安全性定義
+      expect(spec.components?.securitySchemes).toHaveProperty('session');
+      expect(spec.components.securitySchemes.session).toMatchObject({
+        type: 'apiKey',
+        in: 'cookie',
+        name: app.get(AuthConfig).cookieName,
       });
 
       // 驗證核心 API 端點皆有登錄在 OpenAPI paths
@@ -105,6 +96,9 @@ describe('Bathroom Genius API (e2e)', () => {
       expect(paths).toContain('/api/toilets/{id}');
       expect(paths).toContain('/api/toilets/{id}/reviews');
       expect(paths).toContain('/api/reviews/{id}');
+      expect(paths).toContain('/api/auth/csrf');
+      expect(paths).toContain('/api/auth/line/start');
+      expect(paths).toContain('/api/auth/me');
 
       // 驗證 Schemas / DTO 定義
       expect(spec.components.schemas).toHaveProperty('CreateToiletDto');

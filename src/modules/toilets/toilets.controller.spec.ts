@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ToiletsController } from './toilets.controller';
 import { ToiletsService } from './toilets.service';
 import { ConfigService } from '@nestjs/config';
+import { AuthService } from '../auth/auth.service';
 
 describe('ToiletsController', () => {
   let controller: ToiletsController;
@@ -25,6 +26,7 @@ describe('ToiletsController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ToiletsController],
       providers: [
+        { provide: AuthService, useValue: {} },
         {
           provide: ToiletsService,
           useValue: mockToiletsService,

@@ -31,6 +31,22 @@ export class Review {
 
   @Prop({ type: String, required: false })
   userId?: string;
+
+  /** Verified application identity only. Legacy userId is never used for ownership. */
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'User',
+    select: false,
+    index: true,
+  })
+  ownerId?: Types.ObjectId;
 }
 
 export const ReviewSchema = SchemaFactory.createForClass(Review);
+ReviewSchema.set('toJSON', {
+  transform: (_document, result) => {
+    delete result.ownerId;
+    delete result.userId;
+    return result;
+  },
+});

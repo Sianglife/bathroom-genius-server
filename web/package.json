@@ -13,7 +13,7 @@
     "@bathroom-genius/contracts": "workspace:*"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.0",
+    "@playwright/test": "1.64.1",
     "typescript": "^5.7.3",
     "vite": "^7.3.0"
   }

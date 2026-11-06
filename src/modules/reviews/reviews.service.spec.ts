@@ -7,6 +7,11 @@ import { Toilet } from '../toilets/schemas/toilet.schema';
 
 describe('ReviewsService', () => {
   let service: ReviewsService;
+  const actor = {
+    id: '507f1f77bcf86cd799439033',
+    displayName: 'Author',
+    role: 'user' as const,
+  };
 
   const mockReviewInstance = function (dto: any) {
     this.data = dto;
@@ -20,6 +25,9 @@ describe('ReviewsService', () => {
   mockReviewModel.findById = jest.fn();
   mockReviewModel.findByIdAndUpdate = jest.fn();
   mockReviewModel.findByIdAndDelete = jest.fn();
+  mockReviewModel.findOneAndUpdate = jest.fn();
+  mockReviewModel.findOneAndDelete = jest.fn();
+  mockReviewModel.exists = jest.fn();
   mockReviewModel.countDocuments = jest.fn();
   mockReviewModel.deleteMany = jest.fn();
   mockReviewModel.aggregate = jest.fn();
@@ -131,7 +139,7 @@ describe('ReviewsService', () => {
         toiletId: { toString: () => '507f1f77bcf86cd799439011' },
         comment: 'Updated',
       };
-      mockReviewModel.findByIdAndUpdate.mockReturnValue({
+      mockReviewModel.findOneAndUpdate.mockReturnValue({
         exec: jest.fn().mockResolvedValue(mockUpdatedReview),
       });
       mockReviewModel.aggregate.mockResolvedValue([]);
@@ -139,19 +147,30 @@ describe('ReviewsService', () => {
         exec: jest.fn().mockResolvedValue({}),
       });
 
-      const res = await service.update('507f1f77bcf86cd799439022', {
-        comment: 'Updated',
-      });
+      const res = await service.update(
+        '507f1f77bcf86cd799439022',
+        {
+          comment: 'Updated',
+        },
+        actor,
+      );
       expect(res).toEqual(mockUpdatedReview);
     });
 
     it('should throw NotFoundException if review not found', async () => {
-      mockReviewModel.findByIdAndUpdate.mockReturnValue({
+      mockReviewModel.findOneAndUpdate.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
+      });
+      mockReviewModel.exists.mockReturnValue({
         exec: jest.fn().mockResolvedValue(null),
       });
 
       await expect(
-        service.update('507f1f77bcf86cd799439022', { comment: 'Updated' }),
+        service.update(
+          '507f1f77bcf86cd799439022',
+          { comment: 'Updated' },
+          actor,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -162,7 +181,7 @@ describe('ReviewsService', () => {
         _id: '507f1f77bcf86cd799439022',
         toiletId: { toString: () => '507f1f77bcf86cd799439011' },
       };
-      mockReviewModel.findByIdAndDelete.mockReturnValue({
+      mockReviewModel.findOneAndDelete.mockReturnValue({
         exec: jest.fn().mockResolvedValue(mockDeletedReview),
       });
       mockReviewModel.aggregate.mockResolvedValue([]);
@@ -170,7 +189,7 @@ describe('ReviewsService', () => {
         exec: jest.fn().mockResolvedValue({}),
       });
 
-      const res = await service.remove('507f1f77bcf86cd799439022');
+      const res = await service.remove('507f1f77bcf86cd799439022', actor);
       expect(res).toEqual({ message: 'Review deleted successfully' });
     });
   });

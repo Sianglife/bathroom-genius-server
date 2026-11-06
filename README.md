@@ -12,6 +12,8 @@ Intelligent public restroom discovery, recommendation, rating, and community rev
 
 Web application foundation: [網頁開發與 API 契約](docs/web-app-foundation.zh-TW.md). Run `pnpm web:dev` to start the frontend and `pnpm web:build` to build static files.
 
+LINE session authentication and administrator CLI: [LINE 登入與管理員操作](docs/authentication.zh-TW.md). Protected writes require a session cookie, matching Origin and CSRF token; restroom writes require an administrator, and review changes require the author or an administrator.
+
 **Bathroom Genius** is a backend system designed for immediate, on-demand public restroom discovery, navigation, and community review sharing.
 
 Built with **NestJS (TypeScript)**, the system leverages **MongoDB GeoJSON 2dsphere spatial indexing** to provide high-precision nearby restroom queries. It deeply integrates with the **LINE Messaging API (LINE Bot)**, allowing users on the go to share their current location within the LINE messaging app without installing additional native applications. Users receive real-time recommendations featuring dynamic static map thumbnails, facility attributes, cleanliness ratings, and one-tap Google Maps walking navigation.
@@ -25,7 +27,7 @@ Built with **NestJS (TypeScript)**, the system leverages **MongoDB GeoJSON 2dsph
   - Dynamic static map thumbnail generation via Google Maps Static API.
   - One-tap Google Maps walking navigation.
   - Postback actions for instant review inspection.
-- **Community Reviews & Ratings**: Supports anonymous and authenticated review submissions, cleanliness and convenience star ratings, real-time toilet paper availability reporting, and automated average score recalculation.
+- **Community Reviews & Ratings**: Requires LINE session authentication for submissions, with cleanliness and convenience star ratings, toilet paper observations, and automated average score recalculation. Existing anonymous reviews remain readable and are managed by administrators.
 - **Security & Validation**:
   - Global ValidationPipe for payload sanitation and DTO whitelisting.
   - LINE Webhook HMAC-SHA256 signature verification (`LineSignatureGuard`) with raw body validation.
@@ -75,7 +77,11 @@ Environment variable reference:
 | `LINE_CHANNEL_SECRET` | **Yes** | LINE Channel Secret (used for Webhook signature verification) | `your_channel_secret` |
 | `GOOGLE_MAPS_STATIC_API_KEY`| No | Google Maps Static API Key (for map thumbnails) | `AIzaSy...` |
 | `DNS_SERVERS` | No | Custom DNS servers (comma-separated) | `1.1.1.1,8.8.8.8` |
-| `JWT_SECRET` | No | Reserved JWT secret for future authentication extension | `optional_secret_for_future` |
+| `APP_ORIGIN` | Production | Web origin and allowed write-request Origin | `http://127.0.0.1:5173` |
+| `LINE_LOGIN_CHANNEL_ID` | Production | LINE Login channel ID | See LINE Console |
+| `LINE_LOGIN_CHANNEL_SECRET` | Production | LINE Login channel secret | Server only |
+| `LINE_PROVIDER_ID` | Production | Provider namespace for verified identities | See LINE Console |
+| `JWT_SECRET` | No | Legacy optional JWT verification; not accepted for protected writes | Empty |
 
 ---
 
@@ -231,7 +237,7 @@ sequenceDiagram
 Global prefix: `/api`
 
 ##### Toilets Module (`/api/toilets`)
-- `POST /api/toilets`: Create a new restroom record (supports anonymous or authenticated submissions).
+- `POST /api/toilets`: Create a new restroom record (administrator session, CSRF token and matching Origin required).
 - `GET /api/toilets`: Retrieve a paginated list of restrooms with keyword and attribute filtering.
 - `GET /api/toilets/nearby`: Geospatial discovery based on `latitude`, `longitude`, and `radius` (meters).
 - `GET /api/toilets/:id`: Retrieve restroom details along with rating statistics.
@@ -251,7 +257,7 @@ Global prefix: `/api`
 
 #### 3. API Documentation (Swagger OpenAPI)
 - **Path**: `http://localhost:3000/docs`
-- Contains complete DTO schema definitions, validation rules, request/response examples, and Bearer JWT authentication testing support.
+- Contains DTO schema definitions and session-cookie security metadata. Protected writes also require a matching Origin and `X-CSRF-Token`; see the authentication guide for browser-based testing.
 
 ---
 

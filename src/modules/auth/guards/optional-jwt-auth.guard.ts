@@ -23,17 +23,17 @@ export class OptionalJwtAuthGuard implements CanActivate {
     }
 
     const token = parts[1];
-    const secret =
-      this.configService.get<string>('JWT_SECRET') ||
-      'optional_secret_for_future_extension';
+    const secret = this.configService.get<string>('JWT_SECRET');
+    if (!secret) {
+      request.user = undefined;
+      return true;
+    }
 
     try {
-      const decoded = jwt.verify(token, secret);
-      request.user = decoded;
+      const decoded = jwt.verify(token, secret, { algorithms: ['HS256'] });
+      request.user = typeof decoded === 'object' ? decoded : undefined;
     } catch {
-      const decoded = jwt.decode(token);
-      request.user =
-        typeof decoded === 'object' && decoded !== null ? decoded : undefined;
+      request.user = undefined;
     }
 
     return true;

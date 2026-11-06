@@ -2,9 +2,15 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { ReviewsController } from './reviews.controller';
 import { ReviewsService } from './reviews.service';
+import { AuthService } from '../auth/auth.service';
 
 describe('ReviewsController', () => {
   let controller: ReviewsController;
+  const actor = {
+    id: '507f1f77bcf86cd799439033',
+    displayName: 'Author',
+    role: 'user' as const,
+  };
 
   const mockReviewsService = {
     create: jest.fn(),
@@ -23,6 +29,7 @@ describe('ReviewsController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ReviewsController],
       providers: [
+        { provide: AuthService, useValue: {} },
         {
           provide: ReviewsService,
           useValue: mockReviewsService,
@@ -87,11 +94,16 @@ describe('ReviewsController', () => {
       const dto = { comment: 'Updated' };
       mockReviewsService.update.mockResolvedValue({ _id: 'r1', ...dto });
 
-      const res = await controller.update('507f1f77bcf86cd799439011', dto);
+      const res = await controller.update(
+        '507f1f77bcf86cd799439011',
+        dto,
+        actor,
+      );
       expect(res).toBeDefined();
       expect(mockReviewsService.update).toHaveBeenCalledWith(
         '507f1f77bcf86cd799439011',
         dto,
+        actor,
       );
     });
   });
@@ -102,10 +114,11 @@ describe('ReviewsController', () => {
         message: 'Review deleted successfully',
       });
 
-      const res = await controller.remove('507f1f77bcf86cd799439011');
+      const res = await controller.remove('507f1f77bcf86cd799439011', actor);
       expect(res).toEqual({ message: 'Review deleted successfully' });
       expect(mockReviewsService.remove).toHaveBeenCalledWith(
         '507f1f77bcf86cd799439011',
+        actor,
       );
     });
   });

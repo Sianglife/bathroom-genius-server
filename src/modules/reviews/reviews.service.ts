@@ -2,6 +2,8 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -10,6 +12,7 @@ import { Toilet, ToiletDocument } from '../toilets/schemas/toilet.schema';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { QueryReviewDto } from './dto/query-review.dto';
+import type { Principal } from '../auth/auth.utils';
 
 @Injectable()
 export class ReviewsService {
@@ -50,7 +53,7 @@ export class ReviewsService {
       ...createReviewDto,
       toiletId: new Types.ObjectId(toiletId),
       authorName: createReviewDto.authorName || '路過公廁大師',
-      userId,
+      ownerId: userId ? new Types.ObjectId(userId) : undefined,
     });
 
     const savedReview = await createdReview.save();
@@ -90,13 +93,39 @@ export class ReviewsService {
     return { data, total, page, limit };
   }
 
-  async update(id: string, updateReviewDto: UpdateReviewDto): Promise<Review> {
+  private ownershipFilter(id: string, user: Principal) {
+    if (!user) throw new UnauthorizedException('Login required');
+    return {
+      _id: id,
+      ...(user.role === 'admin'
+        ? {}
+        : { ownerId: new Types.ObjectId(user.id) }),
+    };
+  }
+
+  private async rejectMissingOrForbidden(id: string): Promise<never> {
+    if (await this.reviewModel.exists({ _id: id }).exec()) {
+      throw new ForbiddenException(
+        'Only the author or an administrator may change this review',
+      );
+    }
+    throw new NotFoundException(`Review with ID '${id}' not found`);
+  }
+
+  async update(
+    id: string,
+    updateReviewDto: UpdateReviewDto,
+    user: Principal,
+  ): Promise<Review> {
     const updatedReview = await this.reviewModel
-      .findByIdAndUpdate(id, updateReviewDto, { new: true })
+      .findOneAndUpdate(this.ownershipFilter(id, user), updateReviewDto, {
+        new: true,
+        runValidators: true,
+      })
       .exec();
 
     if (!updatedReview) {
-      throw new NotFoundException(`Review with ID '${id}' not found`);
+      return this.rejectMissingOrForbidden(id);
     }
 
     await this.updateToiletScoresAndCount(updatedReview.toiletId.toString());
@@ -104,11 +133,13 @@ export class ReviewsService {
     return updatedReview;
   }
 
-  async remove(id: string): Promise<{ message: string }> {
-    const deletedReview = await this.reviewModel.findByIdAndDelete(id).exec();
+  async remove(id: string, user: Principal): Promise<{ message: string }> {
+    const deletedReview = await this.reviewModel
+      .findOneAndDelete(this.ownershipFilter(id, user))
+      .exec();
 
     if (!deletedReview) {
-      throw new NotFoundException(`Review with ID '${id}' not found`);
+      return this.rejectMissingOrForbidden(id);
     }
 
     await this.updateToiletScoresAndCount(deletedReview.toiletId.toString());

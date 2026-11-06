@@ -83,12 +83,12 @@ describe('Rich Menu Constants', () => {
   });
 
   describe('Rich Menu Image Asset', () => {
-    it('should have a valid richmenu.png file in assets directory with correct size and dimensions', () => {
+    it('should have a valid richmenu.png file in richmenu directory with correct size and dimensions', () => {
       const fs = require('fs');
       const path = require('path');
       const imagePath = path.resolve(
         __dirname,
-        '../../../../assets/richmenu/richmenu.png',
+        '../../../../richmenu/richmenu.png',
       );
 
       expect(fs.existsSync(imagePath)).toBe(true);

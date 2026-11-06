@@ -192,7 +192,7 @@ export function generateRichMenuImage(outputPath: string): void {
 if (require.main === module) {
   const defaultPath = path.resolve(
     __dirname,
-    '../assets/richmenu/richmenu.png',
+    '../richmenu/richmenu.png',
   );
   generateRichMenuImage(defaultPath);
 }

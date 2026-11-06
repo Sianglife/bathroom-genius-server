@@ -110,7 +110,7 @@ describe('HttpExceptionFilter', () => {
       expect.objectContaining({
         statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
         path: '/test-path',
-        message: 'Database connection failed',
+        message: 'Internal server error',
         timestamp: expect.any(String),
       }),
     );

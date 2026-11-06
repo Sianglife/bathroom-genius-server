@@ -66,7 +66,7 @@ describe('OptionalJwtAuthGuard', () => {
     expect(req.user.username).toBe('testuser');
   });
 
-  it('should handle unverified tokens gracefully by decoding or setting user undefined', () => {
+  it('must not trust payloads whose signature verification failed', () => {
     const payload = { userId: 'user-456' };
     const token = jwt.sign(payload, 'wrong-secret');
     const context = createMockContext({ authorization: `Bearer ${token}` });
@@ -75,7 +75,14 @@ describe('OptionalJwtAuthGuard', () => {
     const req = context.switchToHttp().getRequest();
 
     expect(result).toBe(true);
-    expect(req.user.userId).toBe('user-456');
+    expect(req.user).toBeUndefined();
+  });
+
+  it('must not trust an expired token', () => {
+    const token = jwt.sign({ userId: 'user-456' }, secret, { expiresIn: -1 });
+    const context = createMockContext({ authorization: `Bearer ${token}` });
+    guard.canActivate(context);
+    expect(context.switchToHttp().getRequest().user).toBeUndefined();
   });
 
   it('should set user to undefined if token is completely invalid string', () => {

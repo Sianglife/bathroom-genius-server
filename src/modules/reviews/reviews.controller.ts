@@ -10,7 +10,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
-  ApiBearerAuth,
+  ApiCookieAuth,
+  ApiHeader,
   ApiOperation,
   ApiParam,
   ApiResponse,
@@ -20,18 +21,20 @@ import { ReviewsService } from './reviews.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { QueryReviewDto } from './dto/query-review.dto';
-import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { CsrfGuard, SessionAuthGuard } from '../auth/guards/session-auth.guard';
+import type { Principal } from '../auth/auth.utils';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ParseObjectIdPipe } from '../../common/pipes/parse-object-id.pipe';
 
 @ApiTags('Reviews')
-@ApiBearerAuth('bearer')
 @Controller()
 export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
 
   @Post('toilets/:id/reviews')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(SessionAuthGuard, CsrfGuard)
+  @ApiCookieAuth('session')
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
   @ApiOperation({
     summary: '為指定廁所新增評論',
     description:
@@ -47,7 +50,7 @@ export class ReviewsController {
   create(
     @Param('id', ParseObjectIdPipe) toiletId: string,
     @Body() createReviewDto: CreateReviewDto,
-    @CurrentUser('userId') userId?: string,
+    @CurrentUser('id') userId: string,
   ) {
     return this.reviewsService.create(toiletId, createReviewDto, userId);
   }
@@ -69,7 +72,9 @@ export class ReviewsController {
   }
 
   @Patch('reviews/:id')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(SessionAuthGuard, CsrfGuard)
+  @ApiCookieAuth('session')
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
   @ApiOperation({
     summary: '修改特定評論',
     description: '更新評論內容或評分，並自動重新計算關聯廁所的平均評分',
@@ -81,12 +86,15 @@ export class ReviewsController {
   update(
     @Param('id', ParseObjectIdPipe) id: string,
     @Body() updateReviewDto: UpdateReviewDto,
+    @CurrentUser() user: Principal,
   ) {
-    return this.reviewsService.update(id, updateReviewDto);
+    return this.reviewsService.update(id, updateReviewDto, user);
   }
 
   @Delete('reviews/:id')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(SessionAuthGuard, CsrfGuard)
+  @ApiCookieAuth('session')
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
   @ApiOperation({
     summary: '刪除特定評論',
     description: '刪除指定評論，並自動重新計算關聯廁所的平均得分與總評論數',
@@ -95,7 +103,10 @@ export class ReviewsController {
   @ApiResponse({ status: 200, description: '成功刪除評論並更新平均得分' })
   @ApiResponse({ status: 400, description: '無效的 ObjectID 格式' })
   @ApiResponse({ status: 404, description: '找不到指定的評論' })
-  remove(@Param('id', ParseObjectIdPipe) id: string) {
-    return this.reviewsService.remove(id);
+  remove(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @CurrentUser() user: Principal,
+  ) {
+    return this.reviewsService.remove(id, user);
   }
 }

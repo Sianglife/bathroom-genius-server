@@ -36,13 +36,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
         `Unhandled Exception: ${exception.message}`,
         exception.stack,
       );
-      message = exception.message;
     }
 
     response.status(status).json({
       statusCode: status,
       timestamp: new Date().toISOString(),
-      path: request.url,
+      path: request.url.split('?')[0],
       message,
     });
   }

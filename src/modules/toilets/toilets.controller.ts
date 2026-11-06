@@ -10,7 +10,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
-  ApiBearerAuth,
+  ApiCookieAuth,
+  ApiHeader,
   ApiOperation,
   ApiParam,
   ApiResponse,
@@ -21,27 +22,32 @@ import { CreateToiletDto } from './dto/create-toilet.dto';
 import { UpdateToiletDto } from './dto/update-toilet.dto';
 import { QueryToiletDto } from './dto/query-toilet.dto';
 import { NearbyToiletDto } from './dto/nearby-toilet.dto';
-import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import {
+  AdminGuard,
+  CsrfGuard,
+  SessionAuthGuard,
+} from '../auth/guards/session-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ParseObjectIdPipe } from '../../common/pipes/parse-object-id.pipe';
 
 @ApiTags('Toilets')
-@ApiBearerAuth('bearer')
 @Controller('toilets')
 export class ToiletsController {
   constructor(private readonly toiletsService: ToiletsService) {}
 
   @Post()
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(SessionAuthGuard, CsrfGuard, AdminGuard)
+  @ApiCookieAuth('session')
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
   @ApiOperation({
     summary: '新增廁所資訊',
-    description: '建立新廁所，支援匿名或登入使用者（預留 Token 認證）',
+    description: '僅管理員可建立新廁所，須提供有效 session 與 CSRF token',
   })
   @ApiResponse({ status: 201, description: '成功建立廁所資訊' })
   @ApiResponse({ status: 400, description: '請求格式或欄位驗證錯誤' })
   create(
     @Body() createToiletDto: CreateToiletDto,
-    @CurrentUser('userId') userId?: string,
+    @CurrentUser('id') userId: string,
   ) {
     return this.toiletsService.create(createToiletDto, userId);
   }
@@ -82,7 +88,9 @@ export class ToiletsController {
   }
 
   @Patch(':id')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(SessionAuthGuard, CsrfGuard, AdminGuard)
+  @ApiCookieAuth('session')
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
   @ApiOperation({
     summary: '修改廁所資訊',
     description: '更新指定廁所的基礎資料或設備狀態',
@@ -99,7 +107,9 @@ export class ToiletsController {
   }
 
   @Delete(':id')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(SessionAuthGuard, CsrfGuard, AdminGuard)
+  @ApiCookieAuth('session')
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
   @ApiOperation({
     summary: '刪除廁所資訊',
     description: '刪除指定廁所及其關聯之所有評論資料',
