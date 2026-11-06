@@ -10,6 +10,8 @@ Intelligent public restroom discovery, recommendation, rating, and community rev
 
 ## Introduction
 
+Web application foundation: [網頁開發與 API 契約](docs/web-app-foundation.zh-TW.md). Run `pnpm web:dev` to start the frontend and `pnpm web:build` to build static files.
+
 **Bathroom Genius** is a backend system designed for immediate, on-demand public restroom discovery, navigation, and community review sharing.
 
 Built with **NestJS (TypeScript)**, the system leverages **MongoDB GeoJSON 2dsphere spatial indexing** to provide high-precision nearby restroom queries. It deeply integrates with the **LINE Messaging API (LINE Bot)**, allowing users on the go to share their current location within the LINE messaging app without installing additional native applications. Users receive real-time recommendations featuring dynamic static map thumbnails, facility attributes, cleanliness ratings, and one-tap Google Maps walking navigation.

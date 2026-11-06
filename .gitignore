@@ -2,6 +2,10 @@
 /dist
 /node_modules
 /build
+/web/dist/
+/web/node_modules/
+/web/test-results/
+/web/playwright-report/
 
 # Logs
 logs

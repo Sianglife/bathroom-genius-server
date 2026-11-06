@@ -6,6 +6,9 @@
   "private": true,
   "license": "MIT",
   "scripts": {
+    "web:dev": "pnpm --filter @bathroom-genius/web dev",
+    "web:build": "pnpm --filter @bathroom-genius/web build",
+    "web:test": "pnpm --filter @bathroom-genius/web test",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
@@ -21,6 +24,7 @@
     "linebot:richmenu": "ts-node scripts/setup-richmenu.ts"
   },
   "dependencies": {
+    "@bathroom-genius/contracts": "workspace:*",
     "@line/bot-sdk": "^11.2.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",

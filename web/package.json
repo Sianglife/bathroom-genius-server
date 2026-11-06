@@ -1,0 +1,20 @@
+{
+  "name": "@bathroom-genius/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "@bathroom-genius/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.0",
+    "typescript": "^5.7.3",
+    "vite": "^7.3.0"
+  }
+}
