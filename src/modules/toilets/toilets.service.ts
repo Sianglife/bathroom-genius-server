@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Toilet, ToiletDocument } from './schemas/toilet.schema';
@@ -52,7 +56,10 @@ export class ToiletsService {
     const andConditions: any[] = [];
 
     if (search) {
-      const searchRegex = new RegExp(search, 'i');
+      const searchRegex = new RegExp(
+        search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+        'i',
+      );
       andConditions.push({
         $or: [
           { name: searchRegex },
@@ -101,30 +108,62 @@ export class ToiletsService {
     }
 
     const skip = (page - 1) * limit;
+    if (!Number.isSafeInteger(skip))
+      throw new BadRequestException('Page is too large');
 
     const [data, total] = await Promise.all([
-      this.toiletModel.find(filter).skip(skip).limit(limit).exec(),
+      this.toiletModel
+        .find(filter)
+        .sort({ _id: 1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
       this.toiletModel.countDocuments(filter).exec(),
     ]);
 
     return { data, total, page, limit };
   }
 
-  async findNearby(nearbyDto: NearbyToiletDto): Promise<any[]> {
+  async findNearby(
+    nearbyDto: NearbyToiletDto,
+  ): Promise<{
+    data: Toilet[];
+    total: number;
+    page: number;
+    limit: number;
+    hasMore: boolean;
+  }> {
     const {
       lat,
       lng,
       radius = 1000,
-      minCleanScore = 3,
-      minConvenienceScore = 3,
+      minCleanScore,
+      minConvenienceScore,
+      search,
       hasToiletPaper,
       isAccessible,
       tags,
       limit = 10,
+      page = 1,
     } = nearbyDto;
 
     const matchQuery: any = {};
     const andConditions: any[] = [];
+
+    if (search) {
+      const pattern = new RegExp(
+        search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+        'i',
+      );
+      andConditions.push({
+        $or: [
+          { name: pattern },
+          { address: pattern },
+          { landmark: pattern },
+          { note: pattern },
+        ],
+      });
+    }
 
     // 評分為 0 / 無評分 (reviewCount === 0) 之廁所避開分數過濾條件
     if (minCleanScore !== undefined) {
@@ -164,6 +203,9 @@ export class ToiletsService {
       matchQuery.$and = andConditions;
     }
 
+    const skip = (page - 1) * limit;
+    if (!Number.isSafeInteger(skip))
+      throw new BadRequestException('Page is too large');
     const pipeline: any[] = [
       {
         $geoNear: {
@@ -172,12 +214,29 @@ export class ToiletsService {
           maxDistance: radius,
           spherical: true,
           query: matchQuery,
+          key: 'location',
         },
       },
-      { $limit: limit },
+      { $sort: { distance: 1, _id: 1 } },
+      {
+        $facet: {
+          data: [{ $skip: skip }, { $limit: limit }],
+          total: [{ $count: 'value' }],
+        },
+      },
     ];
 
-    return this.toiletModel.aggregate(pipeline).exec();
+    const [result] = await this.toiletModel
+      .aggregate<{ data: Toilet[]; total: { value: number }[] }>(pipeline)
+      .exec();
+    const total = result?.total[0]?.value || 0;
+    return {
+      data: result?.data || [],
+      total,
+      page,
+      limit,
+      hasMore: page * limit < total,
+    };
   }
 
   async findOne(id: string): Promise<Toilet> {

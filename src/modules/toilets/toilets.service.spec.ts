@@ -70,6 +70,7 @@ describe('ToiletsService', () => {
     it('should return paginated toilet results', async () => {
       const mockList = [{ name: 'Toilet 1' }];
       mockToiletModel.find.mockReturnValue({
+        sort: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnValue({
           limit: jest.fn().mockReturnValue({
             exec: jest.fn().mockResolvedValue(mockList),
@@ -99,7 +100,9 @@ describe('ToiletsService', () => {
     it('should call aggregate with $geoNear pipeline and return results', async () => {
       const mockNearbyList = [{ name: 'Nearby Toilet', distance: 150 }];
       mockToiletModel.aggregate.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(mockNearbyList),
+        exec: jest
+          .fn()
+          .mockResolvedValue([{ data: mockNearbyList, total: [{ value: 1 }] }]),
       });
 
       const res = await service.findNearby({
@@ -110,7 +113,13 @@ describe('ToiletsService', () => {
         minConvenienceScore: 3,
       });
 
-      expect(res).toEqual(mockNearbyList);
+      expect(res).toEqual({
+        data: mockNearbyList,
+        total: 1,
+        page: 1,
+        limit: 10,
+        hasMore: false,
+      });
       expect(mockToiletModel.aggregate).toHaveBeenCalled();
     });
   });

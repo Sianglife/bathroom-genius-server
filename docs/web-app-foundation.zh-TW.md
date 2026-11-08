@@ -48,11 +48,11 @@ Vite 將根目錄 `APP_ORIGIN` 的 hostname 加入 `server.allowedHosts`；使�
 | `HealthStatus` | 對應現有 `/api/health` |
 | `ToiletSummary` | 對齊現有廁所資料；API 層須將設施缺值正規化為 null |
 | `Page<T>` | 現有清單分頁格式 |
-| `NearbyPage<T>` | 階段 3 才讓 `/api/toilets/nearby` 回傳此格式 |
+| `NearbyPage<T>` | 階段 4 已補齊必要查詢依賴，`/api/toilets/nearby` 回傳此格式 |
 | `AuthState`、`CurrentUser` | 階段 2 已建立身分與 session，角色以後端為準 |
 | `ReviewInput`、`PublicReview` | 階段 3：匿名顯示、canEdit 及移除公開回應中的內部身分；目前 API 尚未提供 |
 
-附近搜尋使用現有端點，增加 page、limit，回傳 `{ data, total, page, limit, hasMore }`。Bot 固定 page=1、limit=5。此契約變更尚未實作，須同步遷移 Bot 與測試。
+附近搜尋使用現有端點，增加 page、limit，回傳 `{ data, total, page, limit, hasMore }`。Bot 固定 page=1、limit=5。此契約已實作，Bot 與測試已同步遷移，詳見 [搜尋與廁所詳情](search-and-detail.zh-TW.md)。
 
 ## 顯示與表單規則
 
@@ -69,7 +69,7 @@ Vite 將根目錄 `APP_ORIGIN` 的 hostname 加入 `server.allowedHosts`；使�
 
 待測試資料庫可用後，以唯讀查詢盤點：資料筆數、實際索引、無效座標、設施缺值、標籤大小寫、開放時間格式，以及已知位置附近的搜尋結果。不得輸出正式連線憑證或提交正式資料。
 
-階段 1 提供首頁、詳情、撰寫評論、我的評論及找不到頁面的骨架。階段 2 已加入基本登入／登出，搜尋與評論表單仍待後續階段。自動化測試覆蓋路由與帳號入口；真實 LINE 設定與實機測試仍須在環境具備後驗收。
+階段 1 提供路由骨架，階段 2 已加入登入／登出，階段 4 已完成搜尋與詳情；評論表單與我的評論仍待階段 5。實機與部署資料驗收依各階段文件執行。
 
 階段 1 初次驗證：前端建置、後端建置與 2 項 Chromium 路由測試通過；尚未驗證實際資料庫連線。後續已將根目錄 web 指令與 Playwright webServer 統一改為直接呼叫 pnpm，不要求安裝 Corepack。使用者已確認 `pnpm web:dev` 可正常執行。
 

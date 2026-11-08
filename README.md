@@ -12,6 +12,8 @@ Intelligent public restroom discovery, recommendation, rating, and community rev
 
 Web application foundation: [網頁開發與 API 契約](docs/web-app-foundation.zh-TW.md). Run `pnpm web:dev` to start the frontend and `pnpm web:build` to build static files.
 
+Search and detail UI: [搜尋與廁所詳情](docs/search-and-detail.zh-TW.md). `/api/toilets/nearby` now returns `{ data, total, page, limit, hasMore }`; LINE Bot consumes page 1 only. Deploy the backend and Bot together when migrating from the previous array response.
+
 LINE session authentication and administrator CLI: [LINE 登入與管理員操作](docs/authentication.zh-TW.md). Protected writes require a session cookie, matching Origin and CSRF token; restroom writes require an administrator, and review changes require the author or an administrator.
 
 **Bathroom Genius** is a backend system designed for immediate, on-demand public restroom discovery, navigation, and community review sharing.

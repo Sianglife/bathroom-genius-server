@@ -251,7 +251,13 @@ describe('LinebotService', () => {
             avgCleanScore: 4.5,
           },
         ];
-        toiletsService.findNearby.mockResolvedValue(mockToilets);
+        toiletsService.findNearby.mockResolvedValue({
+          data: mockToilets,
+          total: 1,
+          page: 1,
+          limit: DEFAULT_LIMIT,
+          hasMore: false,
+        });
 
         await service.handleEvent(mockLocationEvent);
 
@@ -260,6 +266,9 @@ describe('LinebotService', () => {
           lng: 121.517,
           radius: DEFAULT_SEARCH_RADIUS,
           limit: DEFAULT_LIMIT,
+          page: 1,
+          minCleanScore: 3,
+          minConvenienceScore: 3,
         });
         expect(templateService.createToiletsCarousel).toHaveBeenCalledWith(
           mockToilets,
@@ -276,7 +285,13 @@ describe('LinebotService', () => {
       });
 
       it('should reply with no toilets message when findNearby returns empty array', async () => {
-        toiletsService.findNearby.mockResolvedValue([]);
+        toiletsService.findNearby.mockResolvedValue({
+          data: [],
+          total: 0,
+          page: 1,
+          limit: DEFAULT_LIMIT,
+          hasMore: false,
+        });
 
         await service.handleEvent(mockLocationEvent);
 
@@ -285,6 +300,9 @@ describe('LinebotService', () => {
           lng: 121.517,
           radius: DEFAULT_SEARCH_RADIUS,
           limit: DEFAULT_LIMIT,
+          page: 1,
+          minCleanScore: 3,
+          minConvenienceScore: 3,
         });
         expect(templateService.createNoToiletsMessage).toHaveBeenCalled();
         expect(mockLineClient.replyMessage).toHaveBeenCalledWith({

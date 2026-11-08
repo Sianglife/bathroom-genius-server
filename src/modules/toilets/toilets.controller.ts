@@ -66,7 +66,8 @@ export class ToiletsController {
   @Get('nearby')
   @ApiOperation({
     summary: '依據經緯度推薦附近廁所',
-    description: '依據經緯度座標與指定半徑推薦附近廁所，支援偏好條件篩選',
+    description:
+      '依直線距離與 ID 排序，支援關鍵字、偏好篩選及 page/limit；回傳 data、total、page、limit、hasMore',
   })
   @ApiResponse({ status: 200, description: '成功取得附近廁所推薦列表' })
   @ApiResponse({ status: 400, description: '經緯度或篩選參數錯誤' })

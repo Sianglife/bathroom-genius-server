@@ -6,6 +6,7 @@ import {
   IsString,
   Max,
   Min,
+  MaxLength,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
@@ -17,6 +18,7 @@ export class QueryToiletDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   search?: string;
 
   @ApiPropertyOptional({

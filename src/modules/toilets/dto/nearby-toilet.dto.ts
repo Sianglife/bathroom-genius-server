@@ -7,6 +7,7 @@ import {
   IsString,
   Max,
   Min,
+  MaxLength,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -60,12 +61,11 @@ export class NearbyToiletDto {
   radius?: number = 1000;
 
   /**
-   * 最低乾淨評分 (1~5，預設 3)
+   * 最低乾淨評分 (1~5，未提供時不限)
    */
   @ApiPropertyOptional({
-    description: '最低平均乾淨度得分篩選 (1~5，預設 3)',
+    description: '最低平均乾淨度篩選 (1~5，未提供時不限，保留未評分資料)',
     example: 3,
-    default: 3,
     minimum: 1,
     maximum: 5,
   })
@@ -74,15 +74,14 @@ export class NearbyToiletDto {
   @IsInt()
   @Min(1)
   @Max(5)
-  minCleanScore?: number = 3;
+  minCleanScore?: number;
 
   /**
-   * 最低便利評分 (1~5，預設 3)
+   * 最低便利評分 (1~5，未提供時不限)
    */
   @ApiPropertyOptional({
-    description: '最低平均便利度得分篩選 (1~5，預設 3)',
+    description: '最低平均便利度篩選 (1~5，未提供時不限，保留未評分資料)',
     example: 3,
-    default: 3,
     minimum: 1,
     maximum: 5,
   })
@@ -91,7 +90,22 @@ export class NearbyToiletDto {
   @IsInt()
   @Min(1)
   @Max(5)
-  minConvenienceScore?: number = 3;
+  minConvenienceScore?: number;
+
+  @ApiPropertyOptional({
+    description: '名稱、地址、地標或備註關鍵字，最多 200 字',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  search?: string;
+
+  @ApiPropertyOptional({ default: 1, minimum: 1, description: '頁碼' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
 
   /**
    * 衛生紙條件篩選：

@@ -1,5 +1,7 @@
 import './style.css';
 import { mountAccount } from './auth';
+import { mountSearch } from './search-page';
+import { mountDetail } from './detail-page';
 
 const main = document.querySelector<HTMLElement>('#content')!;
 const path = window.location.pathname.replace(/\/$/, '') || '/';
@@ -11,13 +13,13 @@ const content =
     ? [
         '附近廁所',
         '找到附近，安心出發。',
-        '附近搜尋、定位與設施篩選將於後續階段開放。',
+        '先查看設施與評價，找到適合你的廁所。',
       ]
     : detail
       ? [
           '廁所詳情',
           '先了解設施，再決定目的地。',
-          '詳情與導航功能將於後續階段開放。',
+          '查看設施、開放資訊與使用者評論。',
         ]
       : review
         ? [
@@ -57,7 +59,9 @@ if (pageUrl.searchParams.get('login') === 'cancelled') {
   );
 }
 void mountAccount(document.querySelector<HTMLElement>('#account')!);
-if (path !== '/') {
+if (path === '/') mountSearch(main);
+else if (detail) mountDetail(main, path.split('/')[2]);
+else if (path !== '/') {
   const home = document.createElement('a');
   home.className = 'button';
   home.href = '/';

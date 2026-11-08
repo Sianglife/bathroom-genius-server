@@ -13,7 +13,9 @@ test('direct detail URL survives reload without LINE SDK', async ({ page }) => {
   await page.goto('/toilets/507f1f77bcf86cd799439011');
   await page.reload();
   await expect(page).toHaveTitle('廁所詳情｜Bathroom Genius');
-  await expect(page.getByRole('link', { name: '回到附近廁所' })).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: '← 回到搜尋結果' }),
+  ).toBeVisible();
 });
 
 test('unknown paths offer a route back home', async ({ page }) => {
@@ -48,7 +50,7 @@ test('cancelled LINE login shows a notice on the original page and can be retrie
   const path = '/toilets/507f1f77bcf86cd799439011';
   await page.goto(`${path}?login=cancelled`);
   await expect(page).toHaveTitle('廁所詳情｜Bathroom Genius');
-  await expect(page.getByRole('status')).toHaveText(
+  await expect(page.locator('.notice')).toHaveText(
     '已取消 LINE 登入，你仍可繼續瀏覽。',
   );
   await expect(page).toHaveURL(`http://127.0.0.1:5173${path}`);
@@ -59,7 +61,7 @@ test('cancelled LINE login shows a notice on the original page and can be retrie
     `/api/auth/line/start?${new URLSearchParams({ returnTo: path })}`,
   );
   await page.reload();
-  await expect(page.getByRole('status')).toHaveCount(0);
+  await expect(page.locator('.notice')).toHaveCount(0);
 });
 
 test('logout obtains a CSRF token and refreshes account status', async ({

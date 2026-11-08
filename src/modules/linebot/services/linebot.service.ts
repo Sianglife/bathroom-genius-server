@@ -17,7 +17,7 @@ export class LinebotService {
     private readonly toiletsService: ToiletsService,
     private readonly reviewsService: ReviewsService,
     private readonly templateService: LinebotTemplateService,
-  ) { }
+  ) {}
 
   /**
    * 批次分發與處理多個 LINE Webhook 事件
@@ -94,12 +94,16 @@ export class LinebotService {
       }
     } else if (message.type === 'location') {
       const { latitude, longitude } = message;
-      const toilets = await this.toiletsService.findNearby({
+      const result = await this.toiletsService.findNearby({
         lat: latitude,
         lng: longitude,
         radius: DEFAULT_SEARCH_RADIUS,
         limit: DEFAULT_LIMIT,
+        page: 1,
+        minCleanScore: 3,
+        minConvenienceScore: 3,
       });
+      const toilets = result.data;
 
       if (!toilets || toilets.length === 0) {
         const noToiletsMsg = this.templateService.createNoToiletsMessage();
