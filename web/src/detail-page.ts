@@ -32,7 +32,10 @@ export function mountDetail(container: HTMLElement, id: string) {
       document.title = `${toilet.name}｜Bathroom Genius`;
       status.textContent = '';
       const heading = container.querySelector('h1');
-      if (heading) heading.textContent = toilet.name;
+      if (heading) {
+        heading.textContent = toilet.name;
+        heading.hidden = false;
+      }
       const summary = el('article', undefined, 'detail-card');
       summary.append(el('p', toilet.address, 'address'), facilities(toilet));
       const info = el('dl', undefined, 'detail-info');

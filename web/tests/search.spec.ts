@@ -26,6 +26,26 @@ const result = <T>(items: T[], total = items.length, page = 1, limit = 10) => ({
 });
 
 test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    if (navigator.permissions) {
+      const original = navigator.geolocation.getCurrentPosition.bind(
+        navigator.geolocation,
+      );
+      navigator.geolocation.getCurrentPosition = (
+        success,
+        failure,
+        options,
+      ) => {
+        void navigator.permissions
+          .query({ name: 'geolocation' })
+          .then((permission) => {
+            if (permission.state === 'granted')
+              original(success, failure, options);
+            else failure?.({ code: 1 } as GeolocationPositionError);
+          });
+      };
+    }
+  });
   await page.route('**/api/**', (route) =>
     route.fulfill({ status: 503, json: { message: 'Test only' } }),
   );
@@ -85,9 +105,7 @@ test('explicit location, nearby pagination, detail navigation and cached return'
   });
   await detailApi(page, 11);
   await page.goto('/');
-  await expect(page.locator('.toilet-card')).toHaveCount(1);
-  expect(nearbyCalls).toBe(0);
-  await page.getByRole('button', { name: '使用目前位置', exact: true }).click();
+  await expect(page.getByLabel('名稱或地址')).toBeHidden();
   await expect(page.locator('.toilet-card')).toHaveCount(10);
   await expect(
     page.getByText('直線距離 100 公尺', { exact: true }),
@@ -148,9 +166,6 @@ for (const [code, message] of [
       });
     });
     await page.goto('/');
-    await page
-      .getByRole('button', { name: '使用目前位置', exact: true })
-      .click();
     await expect(page.getByText(new RegExp(message))).toBeVisible();
     await expect(
       page.locator('.toilet-card').getByText('衛生紙：未知'),
@@ -166,7 +181,7 @@ for (const [code, message] of [
     await page
       .getByRole('combobox', { name: '最低乾淨度', exact: true })
       .selectOption('4');
-    await page.getByRole('button', { name: '搜尋廁所', exact: true }).click();
+    await page.getByLabel('名稱或地址').blur();
     await expect
       .poll(() => calls.at(-1)?.searchParams.get('search'))
       .toBe('公園');
@@ -200,7 +215,6 @@ test('empty nearby results offer explicit expansion and filter reset', async ({
     return route.fulfill({ json: result([]) });
   });
   await page.goto('/');
-  await page.getByRole('button', { name: '使用目前位置', exact: true }).click();
   await expect(
     page.getByRole('button', { name: '擴大搜尋範圍' }),
   ).toBeVisible();
@@ -228,7 +242,7 @@ test('failed search retains results and retry replaces them', async ({
     page.getByRole('link', { name: '測試廁所 1', exact: true }),
   ).toBeVisible();
   await page.getByLabel('名稱或地址').fill('新結果');
-  await page.getByRole('button', { name: '搜尋廁所', exact: true }).click();
+  await page.getByLabel('名稱或地址').blur();
   await expect(page.getByRole('alert')).toContainText('搜尋失敗');
   await expect(
     page.getByRole('link', { name: '測試廁所 1', exact: true }),
@@ -260,10 +274,10 @@ test('old search responses cannot replace a newer query', async ({ page }) => {
   });
   await page.goto('/');
   await page.getByLabel('名稱或地址').fill('舊');
-  await page.getByRole('button', { name: '搜尋廁所', exact: true }).click();
+  await page.getByLabel('名稱或地址').blur();
   await expect.poll(() => oldStarted).toBe(true);
   await page.getByLabel('名稱或地址').fill('新');
-  await page.getByRole('button', { name: '搜尋廁所', exact: true }).click();
+  await page.getByLabel('名稱或地址').blur();
   await expect(
     page.getByRole('link', { name: '測試廁所 2', exact: true }),
   ).toBeVisible();
@@ -362,18 +376,15 @@ test('clearing location also ignores a pending GPS callback and removes stored c
     return route.fulfill({ json: result([toilet(1)]) });
   });
   await page.goto('/');
-  await page.getByRole('button', { name: '使用目前位置', exact: true }).click();
   await expect(
     page.getByText('直線距離 100 公尺', { exact: true }),
   ).toBeVisible();
   await page.getByRole('button', { name: '重新定位', exact: true }).click();
-  await page.getByRole('button', { name: '清除位置', exact: true }).click();
+  await page.getByRole('link', { name: '手動輸入', exact: true }).click();
   await page.evaluate(() =>
     (window as unknown as { completeGps: () => void }).completeGps(),
   );
-  await expect(
-    page.getByText('尚未設定位置，可先依名稱或地址搜尋。'),
-  ).toBeVisible();
+  await expect(page.locator('.search-notice')).toBeHidden();
   await expect(page.locator('.toilet-card').getByText(/直線距離/)).toHaveCount(
     0,
   );
@@ -406,7 +417,7 @@ test('desktop directory and mobile filters fit the viewport', async ({
   await page.getByText('篩選條件', { exact: true }).click();
   await expect(
     page.getByRole('combobox', { name: '搜尋半徑', exact: true }),
-  ).toBeVisible();
+  ).toBeHidden();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -416,4 +427,71 @@ test('desktop directory and mobile filters fit the viewport', async ({
     path: '../.tmp/step4-search-mobile.png',
     fullPage: true,
   });
+});
+
+test('manual mode excludes GPS and switching back clears the keyword', async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(['geolocation']);
+  await context.setGeolocation({ latitude: 25, longitude: 121.5 });
+  const calls: URL[] = [];
+  await page.route('**/api/toilets**', (route) => {
+    calls.push(new URL(route.request().url()));
+    return route.fulfill({ json: result([toilet(1)]) });
+  });
+  await page.goto('/');
+  await expect(page.locator('.toilet-card')).toHaveCount(1);
+  await expect(page.getByLabel('名稱或地址')).toBeHidden();
+  await expect(
+    page.getByRole('button', { name: '搜尋廁所', exact: true }),
+  ).toBeHidden();
+  await page.getByText('篩選條件', { exact: true }).click();
+  await page
+    .getByRole('combobox', { name: '搜尋半徑', exact: true })
+    .selectOption('500');
+  await expect.poll(() => calls.at(-1)?.searchParams.get('radius')).toBe('500');
+  await page.getByRole('link', { name: '手動輸入', exact: true }).click();
+  await page.getByLabel('名稱或地址').fill('車站');
+  await page.getByLabel('名稱或地址').blur();
+  await expect
+    .poll(() => calls.at(-1)?.searchParams.get('search'))
+    .toBe('車站');
+  expect(calls.at(-1)?.searchParams.has('lat')).toBe(false);
+  expect(calls.at(-1)?.searchParams.has('radius')).toBe(false);
+  await expect(
+    page.getByRole('button', { name: '使用目前位置', exact: true }),
+  ).toBeHidden();
+  await expect(
+    page.getByRole('link', { name: '手動輸入', exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole('link', { name: '使用目前位置', exact: true }).click();
+  await expect.poll(() => calls.at(-1)?.pathname).toBe('/api/toilets/nearby');
+  expect(calls.at(-1)?.searchParams.has('search')).toBe(false);
+  await expect(page.getByLabel('名稱或地址')).toBeHidden();
+});
+
+test('detail loading does not flash a placeholder heading', async ({
+  page,
+}) => {
+  let release: () => void = () => {};
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(`**/api/toilets/${id(1)}`, async (route) => {
+    await pending;
+    await route.fulfill({ json: toilet(1) });
+  });
+  await page.goto(`/toilets/${id(1)}`);
+  await expect(
+    page.getByText('正在載入廁所資訊…', { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator('h1')).toBeHidden();
+  await expect(
+    page.getByText('先了解設施，再決定目的地。', { exact: true }),
+  ).toHaveCount(0);
+  release();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    toilet(1).name,
+  );
 });

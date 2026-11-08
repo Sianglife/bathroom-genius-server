@@ -24,7 +24,6 @@ export function mountSearch(container: HTMLElement) {
   form.setAttribute('aria-label', '搜尋與篩選');
   form.innerHTML = `
     <label class="search-field">名稱或地址<input name="search" type="search" maxlength="200" placeholder="例如：台北車站、大安公園" autocomplete="off"></label>
-    <button type="submit" class="primary">搜尋廁所</button>
     <details class="filter-panel"><summary>篩選條件</summary><div class="filter-grid">
       <label>搜尋半徑<select name="radius"><option value="500">500 公尺</option><option value="1000">1 公里</option><option value="3000">3 公里</option></select></label>
       <label>衛生紙<select name="hasToiletPaper"><option value="">不限</option><option value="true">有衛生紙</option><option value="false">沒有衛生紙</option></select></label>
@@ -34,23 +33,28 @@ export function mountSearch(container: HTMLElement) {
       <label>設施標籤<input name="tags" maxlength="200" placeholder="以逗號分隔，例如：親子,24H"></label>
     </div><p class="muted">未評分廁所仍會顯示；標籤符合任一項即可。半徑只在定位後生效。</p></details>`;
   const locationBar = el('div', undefined, 'location-bar');
-  const locationStatus = el(
-    'p',
-    '尚未設定位置，可先依名稱或地址搜尋。',
-    'muted',
-  );
+  const locationStatus = el('p', '', 'notice search-notice');
   locationStatus.setAttribute('role', 'status');
   const locate = button('使用目前位置', locateNow, 'primary');
-  const clearPosition = button('清除位置', () => {
-    ++locationGeneration;
-    locate.disabled = false;
-    position = null;
-    cache = null;
-    clearCache();
-    showPosition();
-    void load(true);
+  const modeLink = el('a', '手動輸入', 'search-mode-link');
+  modeLink.href = '/?mode=manual';
+  modeLink.addEventListener('click', (event) => {
+    event.preventDefault();
+    if (mode === 'current') useManual(true);
+    else {
+      locateNow();
+      locate.focus();
+    }
   });
-  locationBar.append(locate, clearPosition);
+  locationBar.setAttribute('role', 'group');
+  locationBar.setAttribute('aria-label', '搜尋方式');
+  locationBar.append(locate, modeLink);
+  const searchInput = form.elements.namedItem('search') as HTMLInputElement;
+  const searchField = searchInput.closest('label')!;
+  const radiusInput = form.elements.namedItem('radius') as HTMLSelectElement;
+  const resultView = el('section', undefined, 'search-result-view');
+  resultView.setAttribute('aria-label', '搜尋結果');
+  resultView.dataset.view = 'list';
   const status = el('p', undefined, 'search-status');
   status.setAttribute('role', 'status');
   const error = el('div', undefined, 'error-box');
@@ -77,22 +81,20 @@ export function mountSearch(container: HTMLElement) {
     void load(false);
   });
   more.hidden = true;
-  section.append(
-    locationBar,
-    locationStatus,
-    form,
-    status,
-    error,
-    resultHeading,
-    results,
-    empty,
-    more,
-  );
+  resultView.append(status, error, resultHeading, results, empty, more);
+  section.append(locationBar, locationStatus, form, resultView);
   container.append(section);
 
   let filters = readFilters(location.search);
   const cached = readCache();
-  let position: Position | null = cached?.position || null;
+  let mode: 'current' | 'manual' =
+    filters.search ||
+    new URLSearchParams(location.search).get('mode') === 'manual' ||
+    (cached && !cached.position)
+      ? 'manual'
+      : 'current';
+  let position: Position | null =
+    mode === 'current' ? cached?.position || null : null;
   let items: ToiletSummary[] = [];
   let page = 0;
   let total = 0;
@@ -118,20 +120,61 @@ export function mountSearch(container: HTMLElement) {
     }
   }
   function writeUrl(replace = false) {
-    const query = filterQuery(filters);
+    const params = new URLSearchParams(filterQuery(filters));
+    if (mode === 'manual') params.set('mode', 'manual');
+    const query = params.toString();
     const url = query ? `/?${query}` : '/';
     if (`${location.pathname}${location.search}` !== url)
       history[replace ? 'replaceState' : 'pushState'](history.state, '', url);
   }
   function showPosition() {
-    clearPosition.hidden = !position;
+    searchField.hidden = mode !== 'manual';
+    searchInput.disabled = mode !== 'manual';
+    radiusInput.closest('label')!.hidden = mode !== 'current';
+    radiusInput.disabled = mode !== 'current';
+    locate.hidden = mode === 'manual';
+    modeLink.textContent = mode === 'current' ? '手動輸入' : '使用目前位置';
+    const modeParams = new URLSearchParams(
+      filterQuery({ ...filters, search: '' }),
+    );
+    if (mode === 'current') modeParams.set('mode', 'manual');
+    modeLink.href = modeParams.size ? `/?${modeParams}` : '/';
     locate.textContent = position ? '重新定位' : '使用目前位置';
-    locationStatus.textContent = position
-      ? '已設定位置，依直線距離由近到遠搜尋。'
-      : '尚未設定位置，可先依名稱或地址搜尋。';
+    locationStatus.textContent =
+      mode === 'manual' ? '' : position ? '' : '正在取得目前位置…';
+    locationStatus.hidden = !locationStatus.textContent;
+  }
+  function resetResults() {
+    controller?.abort();
+    ++generation;
+    cache = null;
+    clearCache();
+    items = [];
+    page = total = 0;
+    results.replaceChildren();
+    results.setAttribute('aria-busy', 'false');
+    resultHeading.textContent = '搜尋結果';
+    status.textContent = '';
+    more.hidden = empty.hidden = error.hidden = true;
+  }
+  function useManual(focus = false, message?: string) {
+    ++locationGeneration;
+    locate.disabled = false;
+    mode = 'manual';
+    position = null;
+    resetResults();
+    showPosition();
+    if (message) {
+      locationStatus.textContent = message + '，已切換為手動輸入名稱或地址。';
+      locationStatus.hidden = false;
+    }
+    writeUrl();
+    if (focus) searchInput.focus();
+    void load(true);
   }
   function clearFilters() {
     filters = emptyFilters();
+    showPosition();
     fillForm();
     writeUrl();
     void load(true);
@@ -149,12 +192,14 @@ export function mountSearch(container: HTMLElement) {
     if (cache) saveCache({ ...cache, scrollY: window.scrollY });
   }
   async function load(reset: boolean) {
+    if (mode === 'current' && !position) return;
     controller?.abort();
     controller = new AbortController();
     const current = ++generation;
     const next = reset ? 1 : page + 1;
     const currentFilters = { ...filters };
     const currentPosition = position ? { ...position } : null;
+    if (mode === 'current') currentFilters.search = '';
     const params = new URLSearchParams(filterQuery(currentFilters));
     if (currentPosition) {
       params.set('lat', String(currentPosition.lat));
@@ -222,9 +267,15 @@ export function mountSearch(container: HTMLElement) {
     }
   }
   function locateNow() {
+    mode = 'current';
+    filters.search = '';
+    position = null;
+    resetResults();
+    fillForm();
+    showPosition();
+    writeUrl();
     if (!navigator.geolocation) {
-      locationStatus.textContent =
-        '此瀏覽器不支援定位，仍可使用名稱或地址搜尋。';
+      useManual(false, '此瀏覽器不支援定位');
       return;
     }
     locate.disabled = true;
@@ -239,7 +290,7 @@ export function mountSearch(container: HTMLElement) {
           lng: result.coords.longitude,
         };
         if (!validPosition(next)) {
-          locationStatus.textContent = '無法取得有效位置，請重試。';
+          useManual(false, '無法取得有效位置');
           return;
         }
         position = next;
@@ -249,13 +300,19 @@ export function mountSearch(container: HTMLElement) {
       (failure) => {
         if (!active || locationRequest !== locationGeneration) return;
         locate.disabled = false;
-        locationStatus.textContent = `${failure.code === 1 ? '定位權限遭拒絕' : failure.code === 3 ? '定位逾時' : '暫時無法定位'}，可重試或繼續使用名稱、地址搜尋。${position ? '目前保留上次位置。' : ''}`;
+        useManual(
+          false,
+          failure.code === 1
+            ? '定位權限遭拒絕'
+            : failure.code === 3
+              ? '定位逾時'
+              : '暫時無法定位',
+        );
       },
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
     );
   }
-  form.addEventListener('submit', (event) => {
-    event.preventDefault();
+  function submitSearch() {
     const data = new FormData(form);
     const params = new URLSearchParams();
     for (const [key, value] of data) {
@@ -265,10 +322,29 @@ export function mountSearch(container: HTMLElement) {
     fillForm();
     writeUrl();
     void load(true);
+  }
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    submitSearch();
+  });
+  searchInput.addEventListener('blur', () => {
+    if (mode === 'manual') submitSearch();
+  });
+  form.addEventListener('change', (event) => {
+    if (event.target !== searchInput) submitSearch();
   });
   window.addEventListener('popstate', () => {
     filters = readFilters(location.search);
+    if (
+      filters.search ||
+      new URLSearchParams(location.search).get('mode') === 'manual'
+    ) {
+      useManual();
+    } else if (mode === 'manual') {
+      locateNow();
+    }
     fillForm();
+    showPosition();
     void load(true);
   });
   window.addEventListener('scroll', persist, { passive: true });
@@ -301,5 +377,6 @@ export function mountSearch(container: HTMLElement) {
     more.hidden = page * 10 >= total;
     status.textContent = `已還原 ${items.length} 間搜尋結果，可重新搜尋以更新資料。`;
     requestAnimationFrame(() => window.scrollTo(0, cached.scrollY));
-  } else void load(true);
+  } else if (mode === 'current' && !position) locateNow();
+  else void load(true);
 }

@@ -83,6 +83,19 @@ describe('Public restroom search (isolated geospatial database)', () => {
       .get('/api/toilets/nearby')
       .query({ lat: 25, lng: 121.5, ...query });
 
+  it.each(['台北', '臺北'])(
+    'matches equivalent address characters in both search endpoints: %s',
+    async (search) => {
+      const directory = await request(app.getHttpServer())
+        .get('/api/toilets')
+        .query({ search })
+        .expect(200);
+      expect(directory.body.total).toBe(13);
+      const local = await nearby({ search }).expect(200);
+      expect(local.body.total).toBe(12);
+    },
+  );
+
   it('paginates nearby data with a filtered total and stable distance/id ordering', async () => {
     const first = await nearby().expect(200);
     expect(first.body).toMatchObject({

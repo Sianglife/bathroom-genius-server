@@ -1,3 +1,4 @@
+import { searchTextRegex } from './search-text';
 import {
   BadRequestException,
   Injectable,
@@ -56,10 +57,7 @@ export class ToiletsService {
     const andConditions: any[] = [];
 
     if (search) {
-      const searchRegex = new RegExp(
-        search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
-        'i',
-      );
+      const searchRegex = searchTextRegex(search);
       andConditions.push({
         $or: [
           { name: searchRegex },
@@ -124,9 +122,7 @@ export class ToiletsService {
     return { data, total, page, limit };
   }
 
-  async findNearby(
-    nearbyDto: NearbyToiletDto,
-  ): Promise<{
+  async findNearby(nearbyDto: NearbyToiletDto): Promise<{
     data: Toilet[];
     total: number;
     page: number;
@@ -151,10 +147,7 @@ export class ToiletsService {
     const andConditions: any[] = [];
 
     if (search) {
-      const pattern = new RegExp(
-        search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
-        'i',
-      );
+      const pattern = searchTextRegex(search);
       andConditions.push({
         $or: [
           { name: pattern },

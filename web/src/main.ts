@@ -16,11 +16,7 @@ const content =
         '先查看設施與評價，找到適合你的廁所。',
       ]
     : detail
-      ? [
-          '廁所詳情',
-          '先了解設施，再決定目的地。',
-          '查看設施、開放資訊與使用者評論。',
-        ]
+      ? ['廁所詳情', '', '查看設施、開放資訊與使用者評論。']
       : review
         ? [
             '撰寫評論',
@@ -41,6 +37,7 @@ eyebrow.className = 'eyebrow';
 eyebrow.textContent = content[0];
 const title = document.createElement('h1');
 title.textContent = content[1];
+title.hidden = !content[1];
 const description = document.createElement('p');
 description.textContent = content[2];
 main.append(eyebrow, title, description);
