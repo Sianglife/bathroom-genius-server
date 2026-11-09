@@ -6,6 +6,8 @@ export type ReviewDocument = Review & Document;
 
 @Schema({ timestamps: true, versionKey: false })
 export class Review {
+  createdAt: Date;
+  updatedAt: Date;
   @Prop({
     type: MongooseSchema.Types.ObjectId,
     ref: Toilet.name,
@@ -32,6 +34,12 @@ export class Review {
   @Prop({ type: String, required: false })
   userId?: string;
 
+  @Prop({ type: Boolean, required: false })
+  isAnonymous?: boolean;
+
+  @Prop({ type: Number, default: 0 })
+  revision?: number;
+
   /** Verified application identity only. Legacy userId is never used for ownership. */
   @Prop({
     type: MongooseSchema.Types.ObjectId,
@@ -45,6 +53,8 @@ export class Review {
 export const ReviewSchema = SchemaFactory.createForClass(Review);
 ReviewSchema.set('toJSON', {
   transform: (_document, result) => {
+    if (result.isAnonymous === true) result.authorName = '匿名使用者';
+    delete result.revision;
     delete result.ownerId;
     delete result.userId;
     return result;

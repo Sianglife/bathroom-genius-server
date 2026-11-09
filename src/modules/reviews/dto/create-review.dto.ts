@@ -4,11 +4,13 @@ import {
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
   ValidationOptions,
   registerDecorator,
   ValidationArguments,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
@@ -53,7 +55,7 @@ export class CreateReviewDto {
   @IsInt()
   @Min(1)
   @Max(5)
-  cleanScore?: number;
+  cleanScore?: number | null;
 
   @ApiPropertyOptional({
     description: '便利度評分 (1~5，與評語至少二擇一填寫)',
@@ -65,7 +67,7 @@ export class CreateReviewDto {
   @IsInt()
   @Min(1)
   @Max(5)
-  convenienceScore?: number;
+  convenienceScore?: number | null;
 
   @ApiPropertyOptional({
     description: '現場衛生紙狀態回報 (true: 有衛生紙, false: 無衛生紙)',
@@ -73,21 +75,26 @@ export class CreateReviewDto {
   })
   @IsOptional()
   @IsBoolean()
-  hasToiletPaper?: boolean;
+  hasToiletPaper?: boolean | null;
 
   @ApiPropertyOptional({
-    description: '單一文本評論內容 (與評分至少二擇一填寫)',
+    description:
+      '單一文本評論內容，去除頭尾空白後最多 1000 字 (與評分至少二擇一填寫)',
+    maxLength: 1000,
+    nullable: true,
     example: '環境維護得很乾淨，而且有附洗手乳與衛生紙！',
   })
   @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
-  comment?: string;
+  @MaxLength(1000)
+  comment?: string | null;
 
   @ApiPropertyOptional({
-    description: '評論者暱稱 (選填，預設為「訪客」或「路過公廁大師」)',
-    example: '公廁鑑賞家',
+    description: '公開匿名顯示；不移除作者關聯',
+    default: false,
   })
   @IsOptional()
-  @IsString()
-  authorName?: string;
+  @IsBoolean()
+  isAnonymous?: boolean;
 }

@@ -21,6 +21,7 @@ describe('ReviewsService', () => {
   };
 
   const mockReviewModel: any = mockReviewInstance;
+  mockReviewModel.findOne = jest.fn();
   mockReviewModel.find = jest.fn();
   mockReviewModel.findById = jest.fn();
   mockReviewModel.findByIdAndUpdate = jest.fn();
@@ -111,6 +112,7 @@ describe('ReviewsService', () => {
         exec: jest.fn().mockResolvedValue({ _id: '507f1f77bcf86cd799439011' }),
       });
       mockReviewModel.find.mockReturnValue({
+        select: jest.fn().mockReturnThis(),
         sort: jest.fn().mockReturnValue({
           skip: jest.fn().mockReturnValue({
             limit: jest.fn().mockReturnValue({
@@ -139,7 +141,17 @@ describe('ReviewsService', () => {
         toiletId: { toString: () => '507f1f77bcf86cd799439011' },
         comment: 'Updated',
       };
+      mockReviewModel.findOne.mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        exec: jest
+          .fn()
+          .mockResolvedValue({
+            revision: 0,
+            toObject: () => ({ comment: 'Original' }),
+          }),
+      });
       mockReviewModel.findOneAndUpdate.mockReturnValue({
+        select: jest.fn().mockReturnThis(),
         exec: jest.fn().mockResolvedValue(mockUpdatedReview),
       });
       mockReviewModel.aggregate.mockResolvedValue([]);
@@ -154,11 +166,29 @@ describe('ReviewsService', () => {
         },
         actor,
       );
-      expect(res).toEqual(mockUpdatedReview);
+      expect(res).toEqual({
+        ...mockUpdatedReview,
+        hasToiletPaper: null,
+        canEdit: false,
+      });
     });
 
     it('should throw NotFoundException if review not found', async () => {
+      mockReviewModel.findOne.mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        exec: jest
+          .fn()
+          .mockResolvedValue({
+            revision: 0,
+            toObject: () => ({ comment: 'Original' }),
+          }),
+      });
       mockReviewModel.findOneAndUpdate.mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        exec: jest.fn().mockResolvedValue(null),
+      });
+      mockReviewModel.findOne.mockReturnValue({
+        select: jest.fn().mockReturnThis(),
         exec: jest.fn().mockResolvedValue(null),
       });
       mockReviewModel.exists.mockReturnValue({

@@ -1,5 +1,6 @@
 import {
   Injectable,
+  ConflictException,
   NotFoundException,
   BadRequestException,
   ForbiddenException,
@@ -26,23 +27,14 @@ export class ReviewsService {
   async create(
     toiletId: string,
     createReviewDto: CreateReviewDto,
-    userId?: string,
-  ): Promise<Review> {
-    const hasCleanScore =
-      createReviewDto.cleanScore !== undefined &&
-      createReviewDto.cleanScore !== null;
-    const hasConvenienceScore =
-      createReviewDto.convenienceScore !== undefined &&
-      createReviewDto.convenienceScore !== null;
-    const hasComment =
-      typeof createReviewDto.comment === 'string' &&
-      createReviewDto.comment.trim().length > 0;
-
-    if (!hasCleanScore && !hasConvenienceScore && !hasComment) {
-      throw new BadRequestException(
-        "At least one of 'cleanScore', 'convenienceScore', or 'comment' must be provided.",
-      );
-    }
+    user?: Principal,
+  ) {
+    if (typeof createReviewDto.comment === 'string')
+      createReviewDto = {
+        ...createReviewDto,
+        comment: createReviewDto.comment.trim(),
+      };
+    this.validateContent(createReviewDto);
 
     const toilet = await this.toiletModel.findById(toiletId).exec();
     if (!toilet) {
@@ -52,21 +44,23 @@ export class ReviewsService {
     const createdReview = new this.reviewModel({
       ...createReviewDto,
       toiletId: new Types.ObjectId(toiletId),
-      authorName: createReviewDto.authorName || '路過公廁大師',
-      ownerId: userId ? new Types.ObjectId(userId) : undefined,
+      authorName: user?.displayName || '路過公廁大師',
+      isAnonymous: createReviewDto.isAnonymous ?? false,
+      ownerId: user ? new Types.ObjectId(user.id) : undefined,
     });
 
     const savedReview = await createdReview.save();
     await this.updateToiletScoresAndCount(toiletId);
 
-    return savedReview;
+    return this.publicReview(savedReview, user);
   }
 
   async findByToiletId(
     toiletId: string,
     queryDto: QueryReviewDto,
+    user?: Principal,
   ): Promise<{
-    data: Review[];
+    data: ReturnType<ReviewsService['publicReview']>[];
     total: number;
     page: number;
     limit: number;
@@ -83,14 +77,64 @@ export class ReviewsService {
     const [data, total] = await Promise.all([
       this.reviewModel
         .find(filter)
-        .sort({ createdAt: -1 })
+        .select('+ownerId')
+        .sort({ createdAt: -1, _id: -1 })
         .skip(skip)
         .limit(limit)
         .exec(),
       this.reviewModel.countDocuments(filter).exec(),
     ]);
 
-    return { data, total, page, limit };
+    return {
+      data: data.map((review) => this.publicReview(review, user)),
+      total,
+      page,
+      limit,
+    };
+  }
+
+  private validateContent(input: CreateReviewDto) {
+    if (
+      input.isAnonymous !== undefined &&
+      typeof input.isAnonymous !== 'boolean'
+    )
+      throw new BadRequestException('isAnonymous must be a boolean');
+    const comment =
+      typeof input.comment === 'string' ? input.comment.trim() : '';
+    if (comment.length > 1000)
+      throw new BadRequestException('Comment must not exceed 1000 characters');
+    if (
+      input.cleanScore == null &&
+      input.convenienceScore == null &&
+      !comment
+    ) {
+      throw new BadRequestException(
+        'At least one score or non-blank comment must be provided',
+      );
+    }
+  }
+
+  private publicReview(review: ReviewDocument, user?: Principal) {
+    // Read ownership before serialization removes private fields.
+    const canEdit =
+      !!user &&
+      (user.role === 'admin' ||
+        (!!review.ownerId && String(review.ownerId) === user.id));
+    const value =
+      typeof review.toObject === 'function' ? review.toObject() : review;
+    return {
+      _id: value._id,
+      toiletId: value.toiletId,
+      cleanScore: value.cleanScore,
+      convenienceScore: value.convenienceScore,
+      hasToiletPaper: value.hasToiletPaper ?? null,
+      comment: value.comment,
+      authorName: value.isAnonymous === true ? '匿名使用者' : value.authorName,
+      isAnonymous: value.isAnonymous,
+      createdAt: value.createdAt,
+      updatedAt: value.updatedAt,
+      canEdit,
+    };
   }
 
   private ownershipFilter(id: string, user: Principal) {
@@ -112,25 +156,36 @@ export class ReviewsService {
     throw new NotFoundException(`Review with ID '${id}' not found`);
   }
 
-  async update(
-    id: string,
-    updateReviewDto: UpdateReviewDto,
-    user: Principal,
-  ): Promise<Review> {
-    const updatedReview = await this.reviewModel
-      .findOneAndUpdate(this.ownershipFilter(id, user), updateReviewDto, {
-        new: true,
-        runValidators: true,
-      })
+  async update(id: string, updateReviewDto: UpdateReviewDto, user: Principal) {
+    const filter = this.ownershipFilter(id, user);
+    const current = await this.reviewModel
+      .findOne(filter)
+      .select('+ownerId')
       .exec();
-
-    if (!updatedReview) {
-      return this.rejectMissingOrForbidden(id);
-    }
+    if (!current) return this.rejectMissingOrForbidden(id);
+    const patch = { ...updateReviewDto };
+    if (typeof patch.comment === 'string') patch.comment = patch.comment.trim();
+    this.validateContent({ ...current.toObject(), ...patch });
+    // Compare-and-swap prevents concurrent valid patches from leaving an empty review.
+    const updatedReview = await this.reviewModel
+      .findOneAndUpdate(
+        {
+          ...filter,
+          $or: current.revision
+            ? [{ revision: current.revision }]
+            : [{ revision: 0 }, { revision: { $exists: false } }],
+        },
+        { $set: patch, $inc: { revision: 1 } },
+        { returnDocument: 'after', runValidators: true },
+      )
+      .select('+ownerId')
+      .exec();
+    if (!updatedReview)
+      throw new ConflictException('Review changed; reload before retrying');
 
     await this.updateToiletScoresAndCount(updatedReview.toiletId.toString());
 
-    return updatedReview;
+    return this.publicReview(updatedReview, user);
   }
 
   async remove(id: string, user: Principal): Promise<{ message: string }> {

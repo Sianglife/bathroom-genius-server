@@ -56,13 +56,13 @@ describe('ReviewsController', () => {
       const res = await controller.create(
         '507f1f77bcf86cd799439011',
         dto,
-        'user123',
+        actor,
       );
       expect(res).toBeDefined();
       expect(mockReviewsService.create).toHaveBeenCalledWith(
         '507f1f77bcf86cd799439011',
         dto,
-        'user123',
+        actor,
       );
     });
   });
@@ -80,11 +80,13 @@ describe('ReviewsController', () => {
       const res = await controller.findByToiletId(
         '507f1f77bcf86cd799439011',
         query,
+        undefined,
       );
       expect(res).toBeDefined();
       expect(mockReviewsService.findByToiletId).toHaveBeenCalledWith(
         '507f1f77bcf86cd799439011',
         query,
+        undefined,
       );
     });
   });

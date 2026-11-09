@@ -6,6 +6,7 @@ import { Model, Types } from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import request from 'supertest';
 import { createHash } from 'node:crypto';
+import { hashToken } from './auth.utils';
 import { AuthModule } from './auth.module';
 import { AuthConfig } from './auth.config';
 import { User } from './schemas/user.schema';
@@ -717,5 +718,170 @@ describe('LINE sessions and authorization (isolated MongoDB)', () => {
     } finally {
       await secureApp.close();
     }
+  });
+  describe('stage 3 review contract', () => {
+    async function write(
+      actor: Awaited<ReturnType<typeof login>>,
+      toiletId: string,
+      body: object,
+    ) {
+      return actor.agent
+        .post(`/api/toilets/${toiletId}/reviews`)
+        .set('Origin', origin)
+        .set('X-CSRF-Token', actor.csrf)
+        .send(body);
+    }
+    async function patch(
+      actor: Awaited<ReturnType<typeof login>>,
+      id: string,
+      body: object,
+    ) {
+      return actor.agent
+        .patch(`/api/reviews/${id}`)
+        .set('Origin', origin)
+        .set('X-CSRF-Token', actor.csrf)
+        .send(body);
+    }
+
+    it('uses the verified name, hides identity, and computes viewer-specific edit permission', async () => {
+      const author = await login();
+      const other = await login('valid-b');
+      const toilet = await fixtureToilet();
+      const response = await write(author, toilet.id, { comment: '  乾淨  ' });
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({
+        authorName: '測試使用者',
+        comment: '乾淨',
+        canEdit: true,
+        isAnonymous: false,
+      });
+      for (const key of ['ownerId', 'userId', 'revision'])
+        expect(response.body).not.toHaveProperty(key);
+      const url = `/api/toilets/${toilet.id}/reviews`;
+      const guest = await request(app.getHttpServer()).get(url).expect(200);
+      expect(guest.body.data[0].canEdit).toBe(false);
+      expect(guest.headers['cache-control']).toContain('no-store');
+      expect(guest.headers.vary).toContain('Cookie');
+      expect((await author.agent.get(url)).body.data[0].canEdit).toBe(true);
+      expect((await other.agent.get(url)).body.data[0].canEdit).toBe(false);
+      await users.updateOne({ _id: other.user.id }, { role: 'admin' });
+      expect((await other.agent.get(url)).body.data[0].canEdit).toBe(true);
+      const revoked = await sessions.deleteOne({
+        tokenHash: hashToken(author.cookie.split('=')[1]),
+      });
+      expect(revoked.deletedCount).toBe(1);
+      const expired = await author.agent.get(url).expect(200);
+      expect(expired.body.data[0].canEdit).toBe(false);
+    });
+
+    it('keeps anonymous ownership, conceals the name in API and Bot serialization, and can restore it', async () => {
+      const author = await login();
+      const toilet = await fixtureToilet();
+      const created = await write(author, toilet.id, {
+        cleanScore: 4,
+        isAnonymous: true,
+      });
+      expect(created.status).toBe(201);
+      expect(created.body).toMatchObject({
+        authorName: '匿名使用者',
+        canEdit: true,
+      });
+      const stored = await reviews
+        .findById(created.body._id)
+        .select('+ownerId');
+      expect(String(stored!.ownerId)).toBe(author.user.id);
+      expect(stored!.toJSON().authorName).toBe('匿名使用者');
+      const updated = await patch(author, created.body._id, {
+        isAnonymous: false,
+      });
+      expect(updated.status).toBe(200);
+      expect(updated.body.authorName).toBe('測試使用者');
+    });
+
+    it('rejects supplied names, oversized text, whitespace-only and paper-only reviews', async () => {
+      const author = await login();
+      const toilet = await fixtureToilet();
+      for (const body of [
+        { comment: 'ok', authorName: '偽造名稱' },
+        { comment: '字'.repeat(1001) },
+        { comment: '   ' },
+        { hasToiletPaper: true },
+        { comment: 'ok', isAnonymous: null },
+      ]) {
+        expect((await write(author, toilet.id, body)).status).toBe(400);
+      }
+      expect(
+        (await write(author, toilet.id, { comment: '字'.repeat(1000) })).status,
+      ).toBe(201);
+    });
+
+    it('validates merged patches and allows nullable scores only while content remains', async () => {
+      const author = await login();
+      const toilet = await fixtureToilet();
+      const created = await write(author, toilet.id, { cleanScore: 4 });
+      const id = created.body._id;
+      expect((await patch(author, id, { cleanScore: null })).status).toBe(400);
+      expect((await patch(author, id, { comment: '   ' })).status).toBe(200);
+      expect(
+        (await patch(author, id, { comment: '字'.repeat(1001) })).status,
+      ).toBe(400);
+      expect(
+        (await patch(author, id, { cleanScore: null, comment: '  文字  ' }))
+          .status,
+      ).toBe(200);
+      expect((await patch(author, id, { comment: null })).status).toBe(400);
+      const saved = await reviews.findById(id);
+      expect(saved!.comment).toBe('文字');
+    });
+
+    it('preserves legacy names and rejects ownership claims', async () => {
+      const author = await login();
+      const toilet = await fixtureToilet();
+      const legacy = await reviews.create({
+        toiletId: toilet._id,
+        comment: '舊評論',
+        authorName: '舊暱稱',
+        userId: author.user.id,
+      });
+      const response = await author.agent
+        .get(`/api/toilets/${toilet.id}/reviews`)
+        .expect(200);
+      expect(response.body.data[0]).toMatchObject({
+        authorName: '舊暱稱',
+        canEdit: false,
+      });
+      expect(response.body.data[0]).not.toHaveProperty('userId');
+      expect((await patch(author, legacy.id, { comment: '認領' })).status).toBe(
+        403,
+      );
+      await users.updateOne({ _id: author.user.id }, { role: 'admin' });
+      // Simulate an existing document that predates revision tracking.
+      await reviews.collection.updateOne(
+        { _id: legacy._id },
+        { $unset: { revision: '' } },
+      );
+      expect(
+        (await patch(author, legacy.id, { comment: '管理員修改' })).status,
+      ).toBe(200);
+    });
+
+    it('cannot concurrently clear both remaining content fields', async () => {
+      const author = await login();
+      const toilet = await fixtureToilet();
+      const created = await write(author, toilet.id, {
+        cleanScore: 4,
+        comment: '文字',
+      });
+      const results = await Promise.all([
+        patch(author, created.body._id, { cleanScore: null }),
+        patch(author, created.body._id, { comment: null }),
+      ]);
+      expect(results.filter((result) => result.status === 200)).toHaveLength(1);
+      expect(results.some((result) => [400, 409].includes(result.status))).toBe(
+        true,
+      );
+      const saved = await reviews.findById(created.body._id);
+      expect(saved!.cleanScore != null || !!saved!.comment?.trim()).toBe(true);
+    });
   });
 });

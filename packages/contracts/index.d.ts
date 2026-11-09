@@ -44,22 +44,23 @@ export interface ToiletSummary {
 }
 export type Score = 1 | 2 | 3 | 4 | 5;
 export interface ReviewInput {
-  cleanScore?: Score;
-  convenienceScore?: Score;
+  cleanScore?: Score | null;
+  convenienceScore?: Score | null;
   hasToiletPaper?: FacilityStatus;
-  comment?: string;
-  isAnonymous: boolean;
+  comment?: string | null;
+  isAnonymous?: boolean;
 }
 export interface PublicReview {
   _id: string;
   toiletId: string;
-  cleanScore?: Score;
-  convenienceScore?: Score;
+  cleanScore?: Score | null;
+  convenienceScore?: Score | null;
   hasToiletPaper: FacilityStatus;
-  comment?: string;
+  comment?: string | null;
   authorName: string;
   createdAt: string;
   updatedAt: string;
+  isAnonymous?: boolean;
   canEdit: boolean;
 }
 export interface HealthStatus {

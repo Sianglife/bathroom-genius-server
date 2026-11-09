@@ -50,7 +50,7 @@ Vite 將根目錄 `APP_ORIGIN` 的 hostname 加入 `server.allowedHosts`；使�
 | `Page<T>` | 現有清單分頁格式 |
 | `NearbyPage<T>` | 階段 4 已補齊必要查詢依賴，`/api/toilets/nearby` 回傳此格式 |
 | `AuthState`、`CurrentUser` | 階段 2 已建立身分與 session，角色以後端為準 |
-| `ReviewInput`、`PublicReview` | 階段 3：匿名顯示、canEdit 及移除公開回應中的內部身分；目前 API 尚未提供 |
+| `ReviewInput`、`PublicReview` | 階段 3 PR1 已實作匿名顯示、canEdit 及隱藏內部身分；自動測試通過，手動測試尚未完成 |
 
 附近搜尋使用現有端點，增加 page、limit，回傳 `{ data, total, page, limit, hasMore }`。Bot 固定 page=1、limit=5。此契約已實作，Bot 與測試已同步遷移，詳見 [搜尋與廁所詳情](search-and-detail.zh-TW.md)。
 
@@ -74,3 +74,5 @@ Vite 將根目錄 `APP_ORIGIN` 的 hostname 加入 `server.allowedHosts`；使�
 階段 1 初次驗證：前端建置、後端建置與 2 項 Chromium 路由測試通過；尚未驗證實際資料庫連線。後續已將根目錄 web 指令與 Playwright webServer 統一改為直接呼叫 pnpm，不要求安裝 Corepack。使用者已確認 `pnpm web:dev` 可正常執行。
 
 參考：[Vite 靜態部署](https://vite.dev/guide/static-deploy.html)、[Playwright webServer](https://playwright.dev/docs/test-webserver)。
+
+2026-11-09 更新：評論匿名、canEdit 及輸入驗證已實作，自動測試通過，手動測試全部尚未完成。詳見 [評論 API 進度](review-api-progress.zh-TW.md)；階段 3 其餘項目及階段 5 仍待完成。
